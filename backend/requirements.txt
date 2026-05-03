@@ -1,0 +1,14 @@
+# 核心音频处理
+librosa==0.10.2.post1
+numpy==1.24.4
+scipy==1.11.4
+
+# MIDI 解析与基础音高分析
+pretty_midi==0.2.10
+mido==1.3.2
+
+# Basic Pitch (音频转MIDI)
+basic_pitch==0.2.0
+
+# Agent 工具链兼容
+pydantic==2.5.3

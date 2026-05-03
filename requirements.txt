@@ -1,0 +1,45 @@
+# ==========================================
+# 🤖 LangGraph & Agent Core
+# ==========================================
+langgraph==0.2.56
+langchain==0.3.12
+langchain-core==0.3.25
+langchain-openai==0.2.12
+openai==1.55.3
+pydantic==2.10.3
+typing-extensions==4.12.2
+
+# ==========================================
+# 🔊 Audio Analysis & MIDI Processing (Step 1)
+# ==========================================
+librosa==0.10.2.post1
+numpy==1.24.4
+scipy==1.11.4
+pretty_midi==0.2.10
+basic_pitch==0.1.3
+tensorflow==2.14.0
+soundfile==0.12.1
+resampy==0.4.3
+numba==0.58.1
+llvmlite==0.41.1
+
+# ==========================================
+# 🌐 Backend (FastAPI) & Async I/O
+# ==========================================
+fastapi==0.115.6
+uvicorn==0.34.0
+python-multipart==0.0.18
+aiohttp==3.11.11
+anyio==4.7.0
+
+# ==========================================
+# 🎵 MCP Client & Tools
+# ==========================================
+mcp==1.1.0
+# 注：@eldment/meting-agent 为 npx 运行时服务，无需 pip 安装
+
+# ==========================================
+# 🔓 NCM Decryption & Utilities
+# ==========================================
+ncmdump==1.1.0
+python-dotenv==1.0.1

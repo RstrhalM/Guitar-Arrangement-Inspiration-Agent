@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎸 吉他编曲灵感 Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loader { border-top-color: #3B82F6; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-gray-900 tracking-tight">🎸 吉他编曲灵感推荐 Agent</h1>
+            <p class="text-gray-500 mt-2">音频解析 → 情感意图 → MCP 实时匹配 → 本地无损试听</p>
+        </header>
+
+        <!-- 上传区 -->
+        <div id="upload-zone" class="bg-white p-10 rounded-2xl shadow-sm border-2 border-dashed border-gray-300 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition mb-8">
+            <p class="text-lg font-medium">拖拽音频至此处 或 <span class="text-blue-600">点击选择文件</span></p>
+            <p class="text-sm text-gray-400 mt-1">支持 .mp3, .wav, .flac, .ogg, .aac (建议 < 20MB)</p>
+            <input type="file" id="file-input" class="hidden" accept=".mp3,.wav,.flac,.ogg,.aac">
+        </div>
+
+        <!-- 加载中 -->
+        <div id="loading" class="hidden text-center py-12">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto mb-4"></div>
+            <p class="text-gray-600 animate-pulse font-medium">正在分析 MIDI/节拍/和声，搜索并缓存推荐曲目...</p>
+            <p class="text-xs text-gray-400 mt-2">首次运行可能需加载模型，请耐心等待</p>
+        </div>
+
+        <!-- 结果区 -->
+        <div id="results" class="hidden fade-in space-y-6">
+            <!-- 情感卡片 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                <h2 class="text-xl font-bold mb-4 flex items-center"><span class="mr-2">🎭</span> 编曲情感意图</h2>
+                <div class="grid md:grid-cols-2 gap-4 text-sm">
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <span class="font-semibold text-blue-700">核心情绪:</span>
+                        <p id="emotion-core" class="mt-1 text-gray-800"></p>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg">
+                        <span class="font-semibold text-purple-700">和声张力:</span>
+                        <p id="emotion-tension" class="mt-1 text-gray-800"></p>
+                    </div>
+                </div>
+                <div class="mt-4 bg-gray-50 p-4 rounded-lg">
+                    <span class="font-semibold text-gray-700">结构摘要:</span>
+                    <p id="analysis-summary" class="mt-1 text-gray-600 leading-relaxed"></p>
+                </div>
+            </div>
+
+            <!-- 推荐列表 -->
+            <h2 class="text-xl font-bold flex items-center"><span class="mr-2">🎧</span> 灵感参考曲目</h2>
+            <div id="rec-list" class="space-y-5"></div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div id="error-msg" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4"></div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file-input');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const errorMsg = document.getElementById('error-msg');
+
+        dropZone.onclick = () => fileInput.click();
+        dropZone.ondragover = e => { e.preventDefault(); dropZone.classList.add('border-blue-500', 'bg-blue-50'); };
+        dropZone.ondragleave = () => dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+        dropZone.ondrop = e => { e.preventDefault(); dropZone.classList.remove('border-blue-500', 'bg-blue-50'); handleFile(e.dataTransfer.files[0]); };
+        fileInput.onchange = e => e.target.files[0] && handleFile(e.target.files[0]);
+
+        async function handleFile(file) {
+            loading.classList.remove('hidden'); results.classList.add('hidden'); errorMsg.classList.add('hidden');
+            const formData = new FormData(); formData.append('file', file);
+
+            try {
+                const res = await fetch('http://localhost:8000/api/analyze/upload', { method: 'POST', body: formData });
+                const json = await res.json();
+                if (!res.ok) throw new Error(json.detail || '处理失败');
+                renderResults(json.data);
+            } catch (err) {
+                errorMsg.textContent = `❌ ${err.message}`; errorMsg.classList.remove('hidden');
+            } finally { loading.classList.add('hidden'); }
+        }
+
+        function renderResults(data) {
+            document.getElementById('emotion-core').textContent = data.emotion?.core_emotion || '未识别';
+            document.getElementById('emotion-tension').textContent = `${Math.round((data.emotion?.tension_level || 0) * 100)}%`;
+            document.getElementById('analysis-summary').textContent = data.analysis_summary || '无';
+
+            const list = document.getElementById('rec-list'); list.innerHTML = '';
+            if (!data.recommendations?.length) { list.innerHTML = '<p class="text-gray-500 text-center py-8">暂无推荐</p>'; }
+
+            data.recommendations.forEach(rec => {
+                const audioUrl = rec.preview_url ? `http://localhost:8000/api/media/stream/${rec.preview_url}` : '';
+                const coverUrl = rec.cover_url ? `http://localhost:8000/api/media/stream/${rec.cover_url}` : '';
+
+                const card = document.createElement('div');
+                card.className = 'bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-6';
+                card.innerHTML = `
+                    <div class="w-full md:w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                        ${coverUrl ? `<img src="${coverUrl}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
+                        <div class="hidden w-full h-full bg-gray-200 text-gray-400 items-center justify-center">无封面</div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-xl font-bold truncate">${rec.title} <span class="text-base font-normal text-gray-500 ml-2">${rec.artist}</span></h3>
+                        ${audioUrl ? `<audio controls class="mt-3 w-full h-8" src="${audioUrl}"></audio>` : '<p class="text-xs text-amber-500 mt-2 font-medium">⚠️ 音频缓存失败/版权限制</p>'}
+                        <div class="mt-4 space-y-3 text-sm">
+                            <p class="bg-blue-50 p-3 rounded-lg"><span class="font-semibold text-blue-700">情感匹配:</span> ${rec.match_reason}</p>
+                            <p class="bg-green-50 p-3 rounded-lg"><span class="font-semibold text-green-700">和声/节奏:</span> ${rec.chord_style_sim}</p>
+                            <p class="bg-purple-50 p-3 rounded-lg"><span class="font-semibold text-purple-700">编曲建议:</span> ${rec.arrangement_tip}</p>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+            results.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
