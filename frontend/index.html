@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎸 吉他编曲灵感 Agent</title>
@@ -8,120 +9,248 @@
     <style>
         .loader { border-top-color: #3B82F6; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .fade-in { animation: fadeIn 0.5s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+        .tag-btn:hover { background-color: #dbeafe; color: #2563eb; border-color: #bfdbfe; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 font-sans min-h-screen p-4 md:p-8">
     <div class="max-w-5xl mx-auto">
-        <header class="text-center mb-10">
-            <h1 class="text-4xl font-bold text-gray-900 tracking-tight">🎸 吉他编曲灵感推荐 Agent</h1>
-            <p class="text-gray-500 mt-2">音频解析 → 情感意图 → MCP 实时匹配 → 本地无损试听</p>
+        <!-- 头部 -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">🎸 吉他编曲灵感推荐 Agent</h1>
+            <p class="text-gray-500 mt-2">上传音频片段 → 确认风格引导 → AI 精准匹配参考曲目</p>
         </header>
 
-        <!-- 上传区 -->
-        <div id="upload-zone" class="bg-white p-10 rounded-2xl shadow-sm border-2 border-dashed border-gray-300 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition mb-8">
+        <!-- 1. 上传区 -->
+        <div id="upload-zone" class="bg-white p-8 md:p-10 rounded-2xl shadow-sm border-2 border-dashed border-gray-300 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition mb-6">
             <p class="text-lg font-medium">拖拽音频至此处 或 <span class="text-blue-600">点击选择文件</span></p>
             <p class="text-sm text-gray-400 mt-1">支持 .mp3, .wav, .flac, .ogg, .aac (建议 < 20MB)</p>
             <input type="file" id="file-input" class="hidden" accept=".mp3,.wav,.flac,.ogg,.aac">
         </div>
 
+        <!-- 2. 风格配置区 (上传后显示) -->
+        <div id="style-config" class="hidden bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6 fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2 text-sm overflow-hidden">
+                    <span class="text-green-600 font-medium flex-shrink-0">📂 已加载:</span>
+                    <span id="file-name" class="text-gray-700 font-semibold truncate"></span>
+                </div>
+                <button id="cancel-btn" class="text-gray-400 hover:text-red-500 text-sm font-medium transition flex-shrink-0">✖ 更换文件</button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">🎛️ 风格引导（决定推荐方向，如输入无由agent自行发散）</label>
+                    <input type="text" id="style-input" placeholder="例如：后摇氛围 / 指弹分解 / 失真扫弦 / 布鲁斯推弦 / 爵士延伸 / 数学摇滚"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                    <div class="flex gap-2 mt-3 flex-wrap">
+                        <button class="tag-btn px-3 py-1.5 text-xs bg-gray-100 rounded-full border border-transparent transition cursor-pointer">后摇氛围</button>
+                        <button class="tag-btn px-3 py-1.5 text-xs bg-gray-100 rounded-full border border-transparent transition cursor-pointer">指弹分解</button>
+                        <button class="tag-btn px-3 py-1.5 text-xs bg-gray-100 rounded-full border border-transparent transition cursor-pointer">失真扫弦</button>
+                        <button class="tag-btn px-3 py-1.5 text-xs bg-gray-100 rounded-full border border-transparent transition cursor-pointer">布鲁斯推弦</button>
+                        <button class="tag-btn px-3 py-1.5 text-xs bg-gray-100 rounded-full border border-transparent transition cursor-pointer">爵士延伸</button>
+                        <button class="tag-btn px-3 py-1.5 text-xs bg-gray-100 rounded-full border border-transparent transition cursor-pointer">数学摇滚</button>
+                    </div>
+                </div>
+                <button id="analyze-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span>🚀 确认风格并开始分析</span>
+                </button>
+            </div>
+        </div>
+
         <!-- 加载中 -->
-        <div id="loading" class="hidden text-center py-12">
+        <div id="loading" class="hidden text-center py-12 fade-in">
             <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mx-auto mb-4"></div>
-            <p class="text-gray-600 animate-pulse font-medium">正在分析 MIDI/节拍/和声，搜索并缓存推荐曲目...</p>
+            <p class="text-gray-600 animate-pulse font-medium">正在解析音频特征，结合风格引导搜索匹配...</p>
             <p class="text-xs text-gray-400 mt-2">首次运行可能需加载模型，请耐心等待</p>
         </div>
 
         <!-- 结果区 -->
-        <div id="results" class="hidden fade-in space-y-6">
-            <!-- 情感卡片 -->
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h2 class="text-xl font-bold mb-4 flex items-center"><span class="mr-2">🎭</span> 编曲情感意图</h2>
-                <div class="grid md:grid-cols-2 gap-4 text-sm">
-                    <div class="bg-blue-50 p-4 rounded-lg">
-                        <span class="font-semibold text-blue-700">核心情绪:</span>
-                        <p id="emotion-core" class="mt-1 text-gray-800"></p>
-                    </div>
-                    <div class="bg-purple-50 p-4 rounded-lg">
-                        <span class="font-semibold text-purple-700">和声张力:</span>
-                        <p id="emotion-tension" class="mt-1 text-gray-800"></p>
-                    </div>
-                </div>
-                <div class="mt-4 bg-gray-50 p-4 rounded-lg">
-                    <span class="font-semibold text-gray-700">结构摘要:</span>
-                    <p id="analysis-summary" class="mt-1 text-gray-600 leading-relaxed"></p>
-                </div>
-            </div>
-
-            <!-- 推荐列表 -->
-            <h2 class="text-xl font-bold flex items-center"><span class="mr-2">🎧</span> 灵感参考曲目</h2>
-            <div id="rec-list" class="space-y-5"></div>
-        </div>
+        <div id="results" class="hidden fade-in space-y-6"></div>
 
         <!-- 错误提示 -->
-        <div id="error-msg" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4"></div>
+        <div id="error-msg" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mt-4 text-center font-medium"></div>
     </div>
 
     <script>
+        // DOM 元素
         const dropZone = document.getElementById('upload-zone');
         const fileInput = document.getElementById('file-input');
+        const styleConfig = document.getElementById('style-config');
+        const fileNameEl = document.getElementById('file-name');
+        const styleInput = document.getElementById('style-input');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const tagBtns = document.querySelectorAll('.tag-btn');
         const loading = document.getElementById('loading');
         const results = document.getElementById('results');
         const errorMsg = document.getElementById('error-msg');
 
+        let selectedFile = null;
+
+        // 文件选择与拖拽逻辑
+        function handleFileSelect(file) {
+            if (!file) return;
+            selectedFile = file;
+            fileNameEl.textContent = file.name;
+            dropZone.classList.add('hidden');
+            styleConfig.classList.remove('hidden');
+            styleInput.focus();
+        }
+
         dropZone.onclick = () => fileInput.click();
+        fileInput.onchange = e => handleFileSelect(e.target.files[0]);
         dropZone.ondragover = e => { e.preventDefault(); dropZone.classList.add('border-blue-500', 'bg-blue-50'); };
         dropZone.ondragleave = () => dropZone.classList.remove('border-blue-500', 'bg-blue-50');
-        dropZone.ondrop = e => { e.preventDefault(); dropZone.classList.remove('border-blue-500', 'bg-blue-50'); handleFile(e.dataTransfer.files[0]); };
-        fileInput.onchange = e => e.target.files[0] && handleFile(e.target.files[0]);
+        dropZone.ondrop = e => { e.preventDefault(); dropZone.classList.remove('border-blue-500', 'bg-blue-50'); handleFileSelect(e.dataTransfer.files[0]); };
 
-        async function handleFile(file) {
-            loading.classList.remove('hidden'); results.classList.add('hidden'); errorMsg.classList.add('hidden');
-            const formData = new FormData(); formData.append('file', file);
+        // 标签快捷填入
+        tagBtns.forEach(btn => {
+            btn.onclick = () => {
+                styleInput.value = btn.textContent.trim();
+                styleInput.focus();
+            };
+        });
+
+        // 取消/更换
+        cancelBtn.onclick = () => {
+            selectedFile = null;
+            fileInput.value = '';
+            styleInput.value = '';
+            styleConfig.classList.add('hidden');
+            dropZone.classList.remove('hidden');
+        };
+
+        // 触发分析
+        analyzeBtn.onclick = async () => {
+            const style = styleInput.value.trim();
+            if (!style) {
+                styleInput.classList.add('border-red-500', 'ring-1', 'ring-red-500');
+                setTimeout(() => styleInput.classList.remove('border-red-500', 'ring-1', 'ring-red-500'), 1500);
+                return;
+            }
+            await startAnalysis(selectedFile, style);
+        };
+
+        async function startAnalysis(file, style) {
+            loading.classList.remove('hidden');
+            styleConfig.classList.add('hidden');
+            results.classList.add('hidden');
+            errorMsg.classList.add('hidden');
+            analyzeBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('style', style);
 
             try {
                 const res = await fetch('http://localhost:8000/api/analyze/upload', { method: 'POST', body: formData });
                 const json = await res.json();
-                if (!res.ok) throw new Error(json.detail || '处理失败');
+                if (!res.ok) throw new Error(json.detail || '服务处理失败，请检查后端日志');
                 renderResults(json.data);
             } catch (err) {
-                errorMsg.textContent = `❌ ${err.message}`; errorMsg.classList.remove('hidden');
-            } finally { loading.classList.add('hidden'); }
+                errorMsg.textContent = `❌ ${err.message}`;
+                errorMsg.classList.remove('hidden');
+                styleConfig.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+                analyzeBtn.disabled = false;
+            }
         }
 
+        // 结果渲染
         function renderResults(data) {
-            document.getElementById('emotion-core').textContent = data.emotion?.core_emotion || '未识别';
-            document.getElementById('emotion-tension').textContent = `${Math.round((data.emotion?.tension_level || 0) * 100)}%`;
-            document.getElementById('analysis-summary').textContent = data.analysis_summary || '无';
+            const emotion = data.emotion || {};
+            const recs = data.recommendations || [];
 
-            const list = document.getElementById('rec-list'); list.innerHTML = '';
-            if (!data.recommendations?.length) { list.innerHTML = '<p class="text-gray-500 text-center py-8">暂无推荐</p>'; }
-
-            data.recommendations.forEach(rec => {
-                const audioUrl = rec.preview_url ? `http://localhost:8000/api/media/stream/${rec.preview_url}` : '';
-                const coverUrl = rec.cover_url ? `http://localhost:8000/api/media/stream/${rec.cover_url}` : '';
-
-                const card = document.createElement('div');
-                card.className = 'bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-6';
-                card.innerHTML = `
-                    <div class="w-full md:w-48 h-48 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-                        ${coverUrl ? `<img src="${coverUrl}" class="w-full h-full object-cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
-                        <div class="hidden w-full h-full bg-gray-200 text-gray-400 items-center justify-center">无封面</div>
+            // 1. 情感意图卡片
+            const emotionHtml = `
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="text-blue-600">🎭</span> 编曲情感意图</h2>
+                    <div class="grid md:grid-cols-3 gap-3 text-sm">
+                        <div class="bg-blue-50 p-3 rounded-lg"><span class="font-semibold text-blue-700">核心情绪:</span> ${emotion.core_emotion || '未识别'}</div>
+                        <div class="bg-purple-50 p-3 rounded-lg"><span class="font-semibold text-purple-700">和声张力:</span> ${Math.round((emotion.tension_level || 0) * 100)}%</div>
+                        <div class="bg-gray-50 p-3 rounded-lg"><span class="font-semibold text-gray-700">编曲目的:</span> ${emotion.arrangement_purpose || '-'}</div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-xl font-bold truncate">${rec.title} <span class="text-base font-normal text-gray-500 ml-2">${rec.artist}</span></h3>
-                        ${audioUrl ? `<audio controls class="mt-3 w-full h-8" src="${audioUrl}"></audio>` : '<p class="text-xs text-amber-500 mt-2 font-medium">⚠️ 音频缓存失败/版权限制</p>'}
-                        <div class="mt-4 space-y-3 text-sm">
-                            <p class="bg-blue-50 p-3 rounded-lg"><span class="font-semibold text-blue-700">情感匹配:</span> ${rec.match_reason}</p>
-                            <p class="bg-green-50 p-3 rounded-lg"><span class="font-semibold text-green-700">和声/节奏:</span> ${rec.chord_style_sim}</p>
-                            <p class="bg-purple-50 p-3 rounded-lg"><span class="font-semibold text-purple-700">编曲建议:</span> ${rec.arrangement_tip}</p>
+                </div>
+            `;
+
+            // 2. 段落演变分析卡片 (新增)
+            const rDesc = emotion.rhythm_overall_desc || '无明显节奏变化';
+            const hDesc = emotion.harmonic_overall_desc || '和声色彩稳定延续';
+            const rSections = emotion.rhythm_sections || [];
+            const hSections = emotion.harmonic_sections || [];
+
+            const evolutionHtml = `
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><span class="text-indigo-600">🎼</span> 段落演变分析</h2>
+                    <div class="grid md:grid-cols-2 gap-5">
+                        <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                            <h3 class="font-semibold text-blue-700 mb-2">⏱️ 节拍与速度演变</h3>
+                            <p class="text-sm text-gray-600 mb-3 italic leading-relaxed">${rDesc}</p>
+                            <div class="flex flex-wrap gap-2">
+                                ${rSections.map(s => `<span class="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium border border-blue-200">📍 ${s.measure_range} ${s.emotion_tag}</span>`).join('')}
+                            </div>
+                        </div>
+                        <div class="bg-purple-50/50 p-4 rounded-lg border border-purple-100">
+                            <h3 class="font-semibold text-purple-700 mb-2">🎹 和声色彩演变</h3>
+                            <p class="text-sm text-gray-600 mb-3 italic leading-relaxed">${hDesc}</p>
+                            <div class="flex flex-wrap gap-2">
+                                ${hSections.map(s => {
+                                    const badge = s.has_tension_harmony ? '⚡张力' : '🌊平稳';
+                                    return `<span class="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs rounded-full font-medium border border-purple-200">📍 ${s.measure_range} ${s.emotion_tag} ${badge}</span>`;
+                                }).join('')}
+                            </div>
                         </div>
                     </div>
-                `;
-                list.appendChild(card);
-            });
+                </div>
+            `;
+
+            // 3. 推荐列表
+            let recsHtml = '<h2 class="text-xl font-bold flex items-center gap-2"><span class="text-green-600">🎧</span> 风格匹配推荐</h2><div class="space-y-5">';
+            if (recs.length === 0) {
+                recsHtml += '<div class="bg-white p-8 rounded-xl text-center text-gray-500 border border-dashed">暂无匹配推荐，请尝试更换风格引导词或音频片段</div>';
+            } else {
+                recs.forEach((rec, idx) => {
+                    const audioUrl = rec.preview_url ? `http://localhost:8000/api/media/stream/${rec.preview_url}` : '';
+                    const coverUrl = rec.cover_url ? `http://localhost:8000/api/media/stream/${rec.cover_url}` : '';
+                    const score = typeof rec.style_fit_score === 'number' ? Math.round(rec.style_fit_score * 100) : null;
+
+                    const scoreClass = score >= 80 ? 'bg-green-100 text-green-800 border-green-200' :
+                                      (score >= 60 ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-gray-100 text-gray-600 border-gray-200');
+                    const scoreLabel = score !== null ? `契合度 ${score}%` : 'N/A';
+
+                    recsHtml += `
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-5 fade-in" style="animation-delay: ${idx * 0.05}s">
+                            <div class="w-full md:w-40 h-40 flex-shrink-0 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center relative">
+                                ${coverUrl ? `<img src="${coverUrl}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">` : ''}
+                                <div class="hidden w-full h-full bg-gray-200 text-gray-400 items-center justify-center text-xs">无封面</div>
+                                <div class="absolute top-2 right-2 px-2 py-0.5 rounded text-xs font-bold border ${scoreClass} shadow-sm">${scoreLabel}</div>
+                            </div>
+                            <div class="flex-1 min-w-0 flex flex-col">
+                                <div class="flex flex-col md:flex-row md:items-baseline justify-between gap-2 mb-2">
+                                    <h3 class="text-lg font-bold truncate text-gray-900">${rec.title} <span class="text-base font-normal text-gray-500 ml-2">${rec.artist}</span></h3>
+                                    ${audioUrl
+                                        ? `<audio controls class="w-full md:w-64 h-7 mt-1 md:mt-0" src="${audioUrl}"></audio>`
+                                        : '<span class="text-xs text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded border border-amber-100 self-start">⚠️ 音频缓存受限</span>'}
+                                </div>
+                                <div class="mt-auto space-y-2 text-sm">
+                                    <p class="bg-blue-50/50 p-2.5 rounded-lg border border-blue-100"><span class="font-semibold text-blue-700">💡 匹配逻辑:</span> ${rec.match_reason}</p>
+                                    <p class="bg-green-50/50 p-2.5 rounded-lg border border-green-100"><span class="font-semibold text-green-700">🎼 和声/节奏:</span> ${rec.chord_style_sim}</p>
+                                    <p class="bg-purple-50/50 p-2.5 rounded-lg border border-purple-100"><span class="font-semibold text-purple-700">🛠️ 编曲建议:</span> ${rec.arrangement_tip}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            recsHtml += '</div>';
+
+            // 组装渲染
+            results.innerHTML = emotionHtml + evolutionHtml + recsHtml;
             results.classList.remove('hidden');
+            results.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
     </script>
 </body>

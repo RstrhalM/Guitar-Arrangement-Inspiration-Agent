@@ -1,18 +1,28 @@
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, Any
 from pydantic import BaseModel, Field
 from langgraph.graph import MessagesState
-#pydantic规范化输出
-class ArrangementJSON(BaseModel):
-    metadata: Dict
-    tempo_structure: Dict
-    harmonic_analysis: Dict
-    summary: str
+
+class RhythmSection(BaseModel):
+    measure_range: str = Field(description="小节范围，如 '1-16'")
+    change_desc: str = Field(description="节拍/速度大概变化描述")
+    emotion_tag: str = Field(description="节拍情感标签，如 '稳步推进/呼吸留白/急促驱动'")
+
+class HarmonicSection(BaseModel):
+    measure_range: str = Field(description="小节范围")
+    harmony_desc: str = Field(description="该段落主要和声进行与色彩特征")
+    has_tension_harmony: bool = Field(description="是否包含张力和声（如减和弦、挂留、延伸音）")
+    emotion_tag: str = Field(description="和声情感标签，如 '明朗开阔/悬置不安/暗黑压迫/温暖治愈'")
 
 class EmotionIntent(BaseModel):
-    core_emotion: str          # 如 "压抑释放型", "明朗叙事型"
-    arrangement_purpose: str   # 如 "适合作为副歌前的情绪铺垫段落"
-    tension_level: float       # 0.0 ~ 1.0 和声/节奏张力值
-    reference_tags: List[str]  # 如 ["indie_pop", "post_rock", "guitar_driven"]
+    core_emotion: str
+    arrangement_purpose: str
+    tension_level: float
+    reference_tags: List[str] = Field(default_factory=list)
+    # 🔑 新增段落级分析字段
+    rhythm_sections: List[RhythmSection] = Field(default_factory=list)
+    rhythm_overall_desc: str = ""
+    harmonic_sections: List[HarmonicSection] = Field(default_factory=list)
+    harmonic_overall_desc: str = ""
 
 class SongRecommendation(BaseModel):
     title: str
@@ -21,28 +31,30 @@ class SongRecommendation(BaseModel):
     match_reason: str
     chord_style_sim: str
     arrangement_tip: str
-    preview_url: Optional[str] = None  # 🔑 新增：MCP 抓取的试听链接
-    song_id: Optional[str] = None      # 🔑 新增：用于后续歌词/封面扩展
+    style_fit_score: Optional[float] = Field(None, ge=0.0, le=1.0)
+    preview_url: Optional[str] = None
+    cover_url: Optional[str] = None
+    song_id: Optional[str] = None
+
+class ArrangementJSON(BaseModel):
+    metadata: Dict
+    tempo_structure: Dict
+    harmonic_analysis: Dict
+    summary: str
 
 class MusicAgentState(MessagesState):
     input_type: Literal["audio", "text"] = "text"
     audio_path: Optional[str] = None
     analysis_json: Optional[ArrangementJSON] = None
     emotion_intent: Optional[EmotionIntent] = None
+    user_style_guide: Optional[str] = None
     recommendations: List[SongRecommendation] = []
     nlp_inspiration: Optional[str] = None
-    final_output: Optional[dict] = None  # 👈 关键修复：声明为状态键
+    final_output: Optional[dict] = None
 
-# 🔑 安全序列化函数（替代直接调用 .model_dump()）
-def safe_dump(obj: any) -> any:
-    """递归安全序列化：兼容 Pydantic 模型 / 列表 / 字典 / 基础类型"""
-    if obj is None:
-        return None
-    if hasattr(obj, "model_dump"):  # Pydantic v2 模型
-        return obj.model_dump()
-    if isinstance(obj, list):
-        return [safe_dump(item) for item in obj]
-    if isinstance(obj, dict):
-        return {k: safe_dump(v) for k, v in obj.items()}
-    # 基础类型 (str/int/float/bool) 直接返回
+def safe_dump(obj: Any) -> Any:
+    if obj is None: return None
+    if hasattr(obj, "model_dump"): return obj.model_dump()
+    if isinstance(obj, list): return [safe_dump(i) for i in obj]
+    if isinstance(obj, dict): return {k: safe_dump(v) for k, v in obj.items()}
     return obj

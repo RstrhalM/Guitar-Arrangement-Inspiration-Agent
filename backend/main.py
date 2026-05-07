@@ -1,7 +1,8 @@
 # backend/main.py 头部
 import sys
 from pathlib import Path
-
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from typing import Optional
 # 🔑 自动将项目根目录加入 Python 搜索路径
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -55,7 +56,10 @@ async def _cleanup(file_path: Path):
 
 # 🔑 音频分析入口
 @api.post("/api/analyze/upload")
-async def analyze_audio(file: UploadFile = File(...)):
+async def analyze_audio(
+    file: UploadFile = File(...),
+    style: Optional[str] = Form(default=None, description="风格引导（如：后摇氛围/指弹分解/失真扫弦/布鲁斯推弦）")
+):
     if not file.filename.lower().endswith(('.mp3', '.wav', '.flac', '.ogg', '.aac')):
         raise HTTPException(400, "Unsupported format. Use .mp3/.wav/.flac/.ogg/.aac")
 
@@ -71,7 +75,9 @@ async def analyze_audio(file: UploadFile = File(...)):
             "messages": [], "input_type": "audio",
             "audio_path": str(temp_path.resolve()),
             "analysis_json": None, "emotion_intent": None,
-            "nlp_inspiration": None, "recommendations": [], "final_output": None
+            "nlp_inspiration": None, "recommendations": [],
+            "user_style_guide": style,  # 🔑 新增：透传至工作流
+            "final_output": None
         }
 
         result = await langgraph_app.ainvoke(state)
